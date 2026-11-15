@@ -1,0 +1,68 @@
+// Workshop: prove a level, share it, open the link as another player. Plus sizes.
+import { chromium } from '@playwright/test';
+const out = process.argv[2] ?? 'qa-shots';
+const base = process.argv[3] ?? 'http://127.0.0.1:4180/';
+const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined });
+const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+const page = await ctx.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
+await page.goto(base);
+await page.evaluate(() =>
+  localStorage.setItem('relight.save.v1', JSON.stringify({ version: 1, name: '', track: 'python', seenIntro: true, progress: {}, python: {}, blocks: {}, published: 0,
+    workshop: { title: 'Zig Zag', message: 'Grab the cell and get out!', mode: 'mission', rows: ['########', '#S..#..#', '#.#.#C.#', '#.#...E#', '########'], cells: true, code: '', blocks: null } })));
+await page.reload();
+await page.getByRole('button', { name: 'Continue' }).click();
+await page.waitForTimeout(600);
+await page.getByRole('button', { name: 'Workshop', exact: true }).click();
+await page.getByRole('button', { name: '▶ Test it with code' }).click();
+await page.waitForSelector('.py-status.ready', { timeout: 60000 });
+await page.locator('.cm-content').click();
+await page.keyboard.press('Control+A');
+await page.keyboard.insertText('bot.move_right(2)\nbot.move_down(2)\nbot.move_right(2)\nbot.move_up()\nbot.move_down()\nbot.move_right()\n');
+await page.getByRole('button', { name: '▶ Run' }).click();
+await page.locator('.speed button', { hasText: '4×' }).click();
+await page.waitForSelector('.result-card', { timeout: 20000 });
+await page.screenshot({ path: `${out}/1366-40-ws-proved.png` });
+await page.getByRole('button', { name: /Back to Workshop/ }).click();
+await page.getByRole('button', { name: 'Copy share link' }).click();
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/1366-41-ws-share.png` });
+const link = await page.locator('.share-link').inputValue();
+console.log('link length', link.length);
+// a different pupil opens it
+const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+const p2 = await ctx2.newPage();
+p2.on('pageerror', (e) => errors.push('p2 pageerror: ' + e.message));
+await p2.goto(link);
+await p2.waitForTimeout(800);
+await p2.screenshot({ path: `${out}/1280-42-shared-track.png` });
+await p2.locator('.track-card.blocks').click();
+await p2.waitForTimeout(1500);
+await p2.screenshot({ path: `${out}/1280-43-shared-brief.png` });
+await p2.getByRole('button', { name: 'Skip', exact: true }).click();
+await p2.waitForTimeout(800);
+await p2.screenshot({ path: `${out}/1280-44-shared-blocks.png` });
+// sizes: hub + level at 1920
+const p3 = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
+await p3.goto(base + '#unlock');
+await p3.evaluate(() => localStorage.setItem('relight.save.v1', JSON.stringify({ version: 1, name: '', track: 'blocks', seenIntro: true, progress: { 'docks-1': { done: true, stars: 3 }, 'docks-2': { done: true, stars: 2 }, 'docks-3': { done: true, stars: 3 }, 'docks-4': { done: true, stars: 1 }, 'docks-5': { done: true, stars: 3 }, 'loops-1': { done: true, stars: 2 } }, python: {}, blocks: {}, published: 0, workshop: null })));
+await p3.reload();
+await p3.getByRole('button', { name: 'Continue' }).click();
+await p3.waitForTimeout(1500);
+await p3.screenshot({ path: `${out}/1920-45-hub-lit.png` });
+await p3.keyboard.down('ArrowLeft'); await p3.waitForTimeout(900); await p3.keyboard.up('ArrowLeft');
+await p3.keyboard.down('ArrowDown'); await p3.waitForTimeout(700); await p3.keyboard.up('ArrowDown');
+await p3.waitForTimeout(300);
+await p3.screenshot({ path: `${out}/1920-46-hub-docks.png` });
+await p3.getByRole('button', { name: 'Districts ▾' }).click();
+await p3.getByRole('menuitem', { name: /Signal Spires/ }).click();
+await p3.getByRole('button', { name: /Blind Maze/ }).click();
+await p3.waitForTimeout(600);
+await p3.getByRole('button', { name: 'Skip', exact: true }).click();
+await p3.waitForTimeout(1200);
+await p3.screenshot({ path: `${out}/1920-47-level-blocks.png` });
+console.log(JSON.stringify(errors, null, 1));
+await browser.close();

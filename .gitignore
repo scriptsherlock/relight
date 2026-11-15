@@ -1,0 +1,9 @@
+node_modules/
+dist/
+public/pyodide/
+qa-shots/
+test-results/
+*.tsbuildinfo
+.env
+.env.*
+playwright-report/
