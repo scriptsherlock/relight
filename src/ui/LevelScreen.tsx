@@ -2,7 +2,7 @@
 // Handles both missions (run once, replay) and arcade games (live events).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { codeLines, type Level } from '../content/levels';
+import { codeLines, unmetNeed, type Level } from '../content/levels';
 import type { Frame, MissionResult, Snapshot } from '../engine/types';
 import { getRunner, type ArcadeReply } from '../python/runner';
 import type { Track } from '../save';
@@ -202,6 +202,13 @@ export function LevelScreen(props: Props) {
     } else if (!run.won) {
       addLog({ kind: 'error', title: 'Not yet', text: run.reason });
     }
+    const unmet = allWon ? unmetNeed(level, shownCode) : null;
+    if (unmet) {
+      addLog({ kind: 'warn', title: 'Nearly there', text: unmet });
+      setFailNote(unmet);
+      setPhase('edit');
+      return;
+    }
     if (allWon) {
       const s = computeStars(hintsUsed === 0);
       setStars(s);
@@ -223,7 +230,7 @@ export function LevelScreen(props: Props) {
     }
     setPhase('edit');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, isArcade, hintsUsed, lines]);
+  }, [result, isArcade, hintsUsed, lines, shownCode]);
 
   // ------------------------------------------------------------- arcade
 
@@ -353,12 +360,20 @@ export function LevelScreen(props: Props) {
     setBlocksKey((k) => k + 1);
   };
 
+  const hintCount = level.hints.length;
   const hint = () => {
-    const h = level.hints[Math.min(hintsUsed, level.hints.length - 1)];
-    setHintsUsed((n) => Math.min(level.hints.length, n + 1));
     setLogOpen(true);
     setUnread(0);
-    addLog({ kind: 'hint', title: `Hint ${Math.min(hintsUsed + 1, level.hints.length)}`, text: h });
+    if (hintsUsed < hintCount) {
+      setHintsUsed(hintsUsed + 1);
+      addLog({ kind: 'hint', title: `Hint ${hintsUsed + 1} of ${hintCount}`, text: level.hints[hintsUsed] });
+      return;
+    }
+    // Every hint is out already: show them again only if they have left the log.
+    const missing = level.hints
+      .map((text, i) => ({ kind: 'hint' as const, title: `Hint ${i + 1} of ${hintCount}`, text }))
+      .filter((h) => !log.some((l) => l.kind === 'hint' && l.title === h.title));
+    if (missing.length) addLog(missing);
   };
 
   const switchTrack = (t: Track) => {
@@ -573,8 +588,8 @@ export function LevelScreen(props: Props) {
                 ))}
               </div>
             )}
-            <button className="btn ghost" onClick={hint} disabled={busy}>
-              Hint
+            <button className="btn ghost" onClick={hint} disabled={busy} title={hintsUsed >= hintCount ? 'You have seen every hint. They are in Kilo’s log.' : undefined}>
+              {hintsUsed === 0 ? 'Hint' : hintsUsed < hintCount ? 'Next hint' : 'Show hints'}
             </button>
             <span className={`py-status ${pyStatus}`} title="Kilo's Python core">
               {pyStatus === 'ready' ? 'Python' : pyStatus === 'booting' ? 'Loading…' : pyStatus === 'failed' ? 'Python failed' : ''}

@@ -29,6 +29,7 @@ Teacher shortcut: add `#unlock` to the URL to open every district.
 | Loop Line (3) | Stairs, alleys, snakes | `for` loops, patterns |
 | Signal Spires (3) | Code is run on **hidden test maps** | `if`/`else`, `while`, sensing. Also generalisation, an AI idea |
 | The Arcade (2) | Write `on_key`, `on_tick` and `on_collect` to build a playable game | Events, game AI |
+| The Foundry (6) | Build your own commands with `def`, give them inputs, use variables and nested loops, then write general functions for unseen maps | Functions, parameters, variables, nested loops, abstraction, decomposition |
 | The Workshop | Paint a map, prove it can be beaten, share it as a link; or code your own arcade game | Making, testing, sharing |
 
 Each level has a briefing, three stars (finish / short code / no hints or fast win), and a "grown-up word" card.

@@ -6,7 +6,7 @@ import { parseMap } from '../engine/sim';
 import type { Level, ToolKey } from './levels';
 
 export const WORKSHOP_COLOR = '#C9B6FF';
-const MISSION_TOOLS: ToolKey[] = ['move', 'zap', 'say', 'repeat', 'while', 'if', 'sense'];
+const MISSION_TOOLS: ToolKey[] = ['move', 'zap', 'say', 'repeat', 'while', 'if', 'sense', 'functions', 'variables'];
 const ARCADE_TOOLS: ToolKey[] = [...MISSION_TOOLS, 'events', 'game'];
 
 export const ARCADE_TEMPLATE = `# Your game! These functions run when things happen.
@@ -40,6 +40,22 @@ def on_exit():
     if bot.cells_left() == 0:
         game.win("Kilo escaped!")
 `;
+
+const HANDLERS = /^\s*def\s+on_(key|tick|collect|exit|start)\s*\(/m;
+
+/** Switch Mission/Arcade, swapping in the code that belongs to the new mode. */
+export function switchMode(p: WorkshopProject, mode: 'mission' | 'arcade'): WorkshopProject {
+  if (p.mode === mode) return p;
+  const fallback = mode === 'arcade' ? { code: ARCADE_TEMPLATE, blocks: null } : { code: '', blocks: null };
+  const next = p.other ?? fallback;
+  return { ...p, mode, code: next.code, blocks: next.blocks, other: { code: p.code, blocks: p.blocks } };
+}
+
+/** Repair projects saved before modes kept their own code: a mission holding arcade rules. */
+export function fixProject(p: WorkshopProject): WorkshopProject {
+  if (p.mode === 'mission' && !p.other && HANDLERS.test(p.code)) return { ...p, code: '', blocks: null, other: { code: p.code, blocks: p.blocks } };
+  return p;
+}
 
 export function blankProject(mode: 'mission' | 'arcade' = 'mission'): WorkshopProject {
   return {

@@ -42,6 +42,7 @@ const BOT = [
   ['move_left()', 'Move left'],
   ['move_up()', 'Move up'],
   ['move_down()', 'Move down'],
+  ['move("right", 2)', 'Move in any direction'],
   ['zap("right")', 'Zap a square'],
   ['look("right")', 'What is next to Kilo?'],
   ['at_exit()', 'Is Kilo on the exit?'],

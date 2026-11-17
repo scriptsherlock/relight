@@ -91,6 +91,14 @@ function call(fn: string, ...args: unknown[]): { error: PyError | null } {
 
 export function runMission(code: string, maps: MapRows[], goals: Partial<Goals>, budget?: number) {
   const warnings = JSON.parse(py!.globals.get('check')(code)) as PyError[];
+  // Arcade rules pasted into a mission: nothing ever calls them, so Kilo stands still.
+  const handler = code.split(/\r?\n/).findIndex((l) => /^\s*def\s+on_(key|tick|collect|exit|start)\s*\(/.test(l));
+  if (handler >= 0)
+    warnings.push({
+      title: 'This is game code',
+      detail: 'on_key, on_tick and the other on_ functions only run in arcade games. A mission runs once from top to bottom, so write Kilo’s moves straight in, like bot.move_right(2).',
+      line: handler + 1,
+    });
   const runs: RunResult[] = [];
   for (const rows of maps) {
     sim = new Sim(rows, { mode: 'mission', goals, budget });

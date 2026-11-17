@@ -17,7 +17,20 @@ const C = {
   sense: '#3D8BE0',
   event: '#5FAE2E',
   game: '#2F9E6C',
+  fn: '#3F7FE0',
+  vars: '#E07A2F',
 };
+
+const RESERVED = new Set(['bot', 'game', 'print', 'range', 'random', 'steps', 'n', 'i', 't', 'def', 'for', 'if', 'else', 'elif', 'while', 'in', 'not', 'and', 'or', 'pass', 'return', 'True', 'False', 'None']);
+
+/** Turn whatever was typed into a safe Python function name. */
+export function fnName(raw: string): string {
+  let s = String(raw).trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!s) s = 'my_command';
+  if (/^[0-9]/.test(s)) s = 'do_' + s;
+  if (RESERVED.has(s)) s += '_cmd';
+  return s;
+}
 
 const DIR_OPTIONS = [
   ['right →', 'right'],
@@ -101,6 +114,81 @@ export function defineBlocks(): void {
       previousStatement: null,
       nextStatement: null,
       colour: C.loop,
+    },
+    {
+      type: 'kilo_while',
+      message0: 'repeat while %1',
+      args0: [{ type: 'input_value', name: 'COND', check: 'Boolean' }],
+      message1: '%1',
+      args1: [{ type: 'input_statement', name: 'DO' }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.loop,
+      tooltip: 'Keep repeating while the question is answered yes.',
+    },
+    {
+      type: 'fn_def',
+      message0: 'define %1 %2',
+      args0: [
+        { type: 'field_input', name: 'NAME', text: 'grab' },
+        { type: 'field_dropdown', name: 'PARAM', options: [['(no input)', ''], ['with input n', 'n']] },
+      ],
+      message1: '%1',
+      args1: [{ type: 'input_statement', name: 'DO' }],
+      colour: C.fn,
+      hat: 'cap',
+      tooltip: 'Makes a new command. Nothing happens until you use it with a "do" block.',
+    },
+    {
+      type: 'fn_call',
+      message0: 'do %1',
+      args0: [{ type: 'field_input', name: 'NAME', text: 'grab' }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.fn,
+      tooltip: 'Runs a command you defined. The name must match exactly.',
+    },
+    {
+      type: 'fn_call_n',
+      message0: 'do %1 with n = %2',
+      args0: [
+        { type: 'field_input', name: 'NAME', text: 'clear' },
+        { type: 'field_number', name: 'N', value: 2, min: 1, max: 20, precision: 1 },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.fn,
+      tooltip: 'Runs a command you defined, giving it a number to use as n.',
+    },
+    {
+      type: 'kilo_move_var',
+      message0: 'move %1 %2 squares',
+      args0: [
+        { type: 'field_dropdown', name: 'DIR', options: DIR_OPTIONS },
+        { type: 'field_dropdown', name: 'VAR', options: [['n', 'n'], ['steps', 'steps']] },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.move,
+      tooltip: 'Move Kilo by whatever number n or steps holds right now.',
+    },
+    {
+      type: 'var_set',
+      message0: 'set steps to %1',
+      args0: [{ type: 'field_number', name: 'N', value: 1, min: 0, max: 20, precision: 1 }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.vars,
+      tooltip: 'Stores a number in the variable steps.',
+    },
+    {
+      type: 'var_change',
+      message0: 'add %1 to steps',
+      args0: [{ type: 'field_number', name: 'N', value: 1, min: -10, max: 10, precision: 1 }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: C.vars,
+      tooltip: 'Changes the number stored in steps.',
     },
     {
       type: 'kilo_if',
@@ -243,7 +331,22 @@ export function defineBlocks(): void {
   g.forBlock['kilo_say'] = (b) => `bot.say(${q(b.getFieldValue('TEXT'))})\n`;
   g.forBlock['kilo_repeat'] = (b) => `for i in range(${Number(b.getFieldValue('N'))}):\n${body(b)}`;
   g.forBlock['kilo_while_exit'] = (b) => `while not bot.at_exit():\n${body(b)}`;
-  g.forBlock['kilo_if'] = (b) => `if ${g.valueToCode(b, 'COND', 0) || 'False'}:\n${body(b)}`;
+  g.forBlock['kilo_while'] = (b) => `while ${g.valueToCode(b, 'COND', 0) || 'False'}:\n${body(b)}`;
+  // Functions go to the top of the program, so they exist before anything uses them.
+  g.forBlock['fn_def'] = (b) => {
+    const name = fnName(b.getFieldValue('NAME'));
+    (g as unknown as { definitions_: Record<string, string> }).definitions_['%fn_' + name + '_' + b.id] =`def ${name}(${b.getFieldValue('PARAM')}):\n${body(b)}`;
+    return null;
+  };
+  g.forBlock['fn_call'] = (b) => `${fnName(b.getFieldValue('NAME'))}()\n`;
+  g.forBlock['fn_call_n'] = (b) => `${fnName(b.getFieldValue('NAME'))}(${Number(b.getFieldValue('N'))})\n`;
+  g.forBlock['kilo_move_var'] = (b) => `bot.move_${b.getFieldValue('DIR')}(${b.getFieldValue('VAR')})\n`;
+  g.forBlock['var_set'] = (b) => `steps = ${Number(b.getFieldValue('N'))}\n`;
+  g.forBlock['var_change'] = (b) => {
+    const n = Number(b.getFieldValue('N'));
+    return `steps = steps ${n < 0 ? '-' : '+'} ${Math.abs(n)}\n`;
+  };
+  g.forBlock['kilo_if'] = (b) =>`if ${g.valueToCode(b, 'COND', 0) || 'False'}:\n${body(b)}`;
   g.forBlock['kilo_ifelse'] = (b) =>
     `if ${g.valueToCode(b, 'COND', 0) || 'False'}:\n${body(b)}else:\n${body(b, 'ELSE')}`;
   g.forBlock['kilo_look_is'] = (b) => [
@@ -296,7 +399,22 @@ const TOOL_BLOCKS: Record<ToolKey, object[]> = {
   ],
   say: [{ kind: 'block', type: 'kilo_say' }],
   repeat: [{ kind: 'block', type: 'kilo_repeat' }],
-  while: [{ kind: 'block', type: 'kilo_while_exit' }],
+  while: [
+    { kind: 'block', type: 'kilo_while_exit' },
+    { kind: 'block', type: 'kilo_while', inputs: { COND: { block: { type: 'kilo_look_is', fields: { DIR: 'right', OP: '!=', THING: 'wall' } } } } },
+  ],
+  functions: [
+    { kind: 'block', type: 'fn_def', fields: { NAME: 'grab', PARAM: '' } },
+    { kind: 'block', type: 'fn_call', fields: { NAME: 'grab' } },
+    { kind: 'block', type: 'fn_def', fields: { NAME: 'clear', PARAM: 'n' } },
+    { kind: 'block', type: 'fn_call_n', fields: { NAME: 'clear', N: 2 } },
+    { kind: 'block', type: 'kilo_move_var', fields: { DIR: 'right', VAR: 'n' } },
+  ],
+  variables: [
+    { kind: 'block', type: 'var_set', fields: { N: 1 } },
+    { kind: 'block', type: 'var_change', fields: { N: 1 } },
+    { kind: 'block', type: 'kilo_move_var', fields: { DIR: 'right', VAR: 'steps' } },
+  ],
   if: [
     { kind: 'block', type: 'kilo_if', inputs: { COND: { block: { type: 'kilo_look_is', fields: { DIR: 'right', OP: '==', THING: 'glitch' } } } } },
     { kind: 'block', type: 'kilo_ifelse', inputs: { COND: { block: { type: 'kilo_look_is', fields: { DIR: 'right', OP: '==', THING: 'wall' } } } } },
@@ -323,7 +441,7 @@ const TOOL_BLOCKS: Record<ToolKey, object[]> = {
   ],
 };
 
-const ORDER: ToolKey[] = ['events', 'move', 'zap', 'say', 'repeat', 'while', 'if', 'sense', 'game'];
+const ORDER: ToolKey[] = ['events', 'functions', 'move', 'zap', 'say', 'repeat', 'variables', 'while', 'if', 'sense', 'game'];
 
 export function toolboxFor(tools: ToolKey[]): Blockly.utils.toolbox.ToolboxDefinition {
   const set = new Set<ToolKey>([...tools, 'say']);

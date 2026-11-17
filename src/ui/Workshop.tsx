@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { WorkshopProject } from '../save';
-import { WORKSHOP_COLOR, blankProject, problems, shareUrl, unpackProject } from '../content/share';
+import { WORKSHOP_COLOR, blankProject, problems, shareUrl, switchMode, unpackProject } from '../content/share';
 import { Portrait } from './Comms';
 import { Stage, type StageHandle } from './Stage';
 import { tapOr } from './device';
@@ -177,7 +177,7 @@ export function Workshop({ project: p, verified, onChange, onTest, onShared, onB
           <div className="field">
             <span>Type</span>
             <div className="seg" role="radiogroup" aria-label="Level type">
-              <button role="radio" aria-checked={p.mode === 'mission'} className={p.mode === 'mission' ? 'on' : ''} onClick={() => onChange({ ...p, mode: 'mission' }, true)}>
+              <button role="radio" aria-checked={p.mode === 'mission'} className={p.mode === 'mission' ? 'on' : ''} onClick={() => onChange(switchMode(p, 'mission'), true)}>
                 Mission
                 <small>Players write code to solve it</small>
               </button>
@@ -185,7 +185,7 @@ export function Workshop({ project: p, verified, onChange, onTest, onShared, onB
                 role="radio"
                 aria-checked={p.mode === 'arcade'}
                 className={p.mode === 'arcade' ? 'on' : ''}
-                onClick={() => onChange({ ...p, mode: 'arcade', code: p.code.includes('def on_key') ? p.code : blankProject('arcade').code }, true)}
+                onClick={() => onChange(switchMode(p, 'arcade'), true)}
               >
                 Arcade game
                 <small>You code the rules, players play</small>

@@ -134,7 +134,7 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
   const tip =
     done === 0
       ? tapOr('Drive Kilo to the glowing beacon at The Docks. Tap where you want to go.', 'Drive Kilo to the glowing beacon at The Docks. Use the arrow keys, or click where you want to go.')
-      : litCount === 4
+      : litCount === DISTRICTS.length
         ? 'Every district is back online. Now build something of your own in The Workshop.'
         : nextDistrict
           ? `${nextDistrict.name} needs power. Follow the beacon.`
@@ -158,7 +158,7 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
             {rank.name}
           </span>
           <span className="lit-count">
-            {litCount}/4 districts lit · {done} levels
+            {litCount}/{DISTRICTS.length} districts lit · {done} levels
           </span>
         </div>
         <div className="hub-actions">

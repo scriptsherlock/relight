@@ -3,7 +3,7 @@
 
 import type { Goals, MapRows, Mode } from '../engine/types';
 
-export type DistrictId = 'docks' | 'loops' | 'spires' | 'arcade';
+export type DistrictId = 'docks' | 'loops' | 'spires' | 'arcade' | 'foundry';
 
 export interface District {
   id: DistrictId;
@@ -18,6 +18,7 @@ export const DISTRICTS: District[] = [
   { id: 'loops', name: 'Loop Line', concept: 'Loops', color: '#FF5FD2', blurb: 'Stop repeating yourself.' },
   { id: 'spires', name: 'Signal Spires', concept: 'If & while', color: '#FFBC3D', blurb: 'Code that works on maps it has never seen.' },
   { id: 'arcade', name: 'The Arcade', concept: 'Events', color: '#9BFF5A', blurb: 'Stop playing games. Start making them.' },
+  { id: 'foundry', name: 'The Foundry', concept: 'Functions', color: '#5AA9FF', blurb: 'Build your own commands.' },
 ];
 
 /** A tiny description of starter blocks, turned into Blockly JSON in blocks.ts. */
@@ -39,7 +40,12 @@ export type ToolKey =
   | 'while'
   | 'sense'
   | 'events'
-  | 'game';
+  | 'game'
+  | 'functions'
+  | 'variables';
+
+/** Ideas a level must use, checked after Kilo wins (the map alone can't force them). */
+export type Need = 'def' | 'param' | 'variable';
 
 export interface NewCommand {
   code: string;
@@ -68,6 +74,7 @@ export interface Level {
   solution: string;
   learn: { word: string; text: string };
   arcade?: { needGlitchMoves?: number; timeLimit: number };
+  needs?: Need[];
 }
 
 const mv = (dir: string, n = 1): BlockNode => ({ type: 'kilo_move', fields: { DIR: dir, N: n } });
@@ -476,7 +483,242 @@ export const LEVELS: Level[] = [
     },
     arcade: { needGlitchMoves: 5, timeLimit: 60 },
   },
+
+  // ----------------------------------------------------------- THE FOUNDRY
+  {
+    id: 'foundry-1',
+    district: 'foundry',
+    title: 'Your Own Command',
+    brief: [
+      'The Arcade is buzzing again. One district is still dark: The Foundry, where the city’s commands were first made.',
+      'Kilo only knows the commands it was built with. Here, you build new ones.',
+      'Each bay has a glitch guarding a cell. Teach Kilo one command that clears a bay, then use it four times.',
+    ],
+    kilo: 'A brand new command, just for me? Give it a good name.',
+    goal: 'Build a grab() command and use it to clear all four bays.',
+    newCommands: [
+      { code: 'def grab():', text: 'Makes a new command called grab. The pushed-in lines underneath are what it does.' },
+      { code: 'grab()', text: 'Runs your command. Writing def only teaches Kilo the command; this line uses it.' },
+    ],
+    maps: [['###############', '##C##C###C##C##', '##G##G###G##G##', '#S...........E#', '###############']],
+    goals: { cells: true },
+    mode: 'mission',
+    par: 13,
+    python:
+      '# def makes a new command. The pushed-in lines are what it does.\ndef grab():\n    bot.zap("up")\n    # Finish grab: move up 2, then move down 2.\n\nbot.move_right()\ngrab()\n',
+    blocks: [
+      [{ type: 'fn_def', fields: { NAME: 'grab', PARAM: '' }, body: { DO: [{ type: 'kilo_zap', fields: { DIR: 'up' } }] } }],
+      [mv('right'), { type: 'fn_call', fields: { NAME: 'grab' } }],
+    ],
+    tools: ['move', 'zap', 'functions'],
+    hints: [
+      'grab() should do one bay’s work: zap the glitch above Kilo, go up 2 squares to the cell, then come back down 2.',
+      'Now use grab() under the function, not pushed in. Move right 1, then grab(). Move right 3, grab(). Move right 4, grab(). Move right 3, grab(). Then one last step right to the exit.',
+    ],
+    solution:
+      'def grab():\n    bot.zap("up")\n    bot.move_up(2)\n    bot.move_down(2)\n\nbot.move_right()\ngrab()\nbot.move_right(3)\ngrab()\nbot.move_right(4)\ngrab()\nbot.move_right(3)\ngrab()\nbot.move_right()\n',
+    learn: { word: 'Function', text: 'A named set of instructions you can run again and again. Big programs are built out of lots of small functions.' },
+    needs: ['def'],
+  },
+  {
+    id: 'foundry-2',
+    district: 'foundry',
+    title: 'Give It an Input',
+    brief: [
+      'grab() always does exactly the same thing. That’s fine until things start moving about.',
+      'These glitches are all different distances apart.',
+      'Give your function an input, a number in its brackets, so one command can handle any gap.',
+    ],
+    kilo: 'So clear(2) and clear(4) are the same command with different numbers? Clever.',
+    goal: 'Build clear(n) and use it to get past all four glitches.',
+    newCommands: [
+      { code: 'def clear(n):', text: 'n is an input. Whatever number goes in the brackets when you use clear becomes n.' },
+      { code: '    bot.move_right(n)', text: 'Use n inside the function, just like a number.' },
+      { code: 'clear(4)', text: 'Runs clear with n set to 4.' },
+    ],
+    maps: [['####################', '#S..G....G.G....G.E#', '####################']],
+    goals: {},
+    mode: 'mission',
+    par: 9,
+    python: 'def clear(n):\n    bot.move_right(n)\n    # Add: zap right, then move right 1.\n\nclear(2)\n',
+    blocks: [
+      [{ type: 'fn_def', fields: { NAME: 'clear', PARAM: 'n' }, body: { DO: [{ type: 'kilo_move_var', fields: { DIR: 'right', VAR: 'n' } }] } }],
+      [{ type: 'fn_call_n', fields: { NAME: 'clear', N: 2 } }],
+    ],
+    tools: ['move', 'zap', 'functions'],
+    hints: [
+      'clear(n) should walk n squares, zap the glitch in front of Kilo, then step onto the square it just cleared.',
+      'Count the empty squares before each glitch. The first gap is 2, so start with clear(2). Then clear(4), clear(1) and clear(4). Finish with two steps right.',
+    ],
+    solution:
+      'def clear(n):\n    bot.move_right(n)\n    bot.zap("right")\n    bot.move_right()\n\nclear(2)\nclear(4)\nclear(1)\nclear(4)\nbot.move_right(2)\n',
+    learn: { word: 'Parameter', text: 'An input that a function takes, like n. The same function can do different jobs with different inputs.' },
+    needs: ['param'],
+  },
+  {
+    id: 'foundry-3',
+    district: 'foundry',
+    title: 'Growing Stairs',
+    brief: [
+      'These stairs get longer every step: 1 square, then 2, then 3, then 4.',
+      'A loop repeats the same thing. But here the number has to change each time round.',
+      'Keep the number in a variable, and add 1 to it every time the loop repeats.',
+    ],
+    kilo: 'Every step is longer than the last one. Can my loop keep count?',
+    goal: 'Use a growing variable to get down the stairs and collect every cell.',
+    newCommands: [
+      { code: 'steps = 1', text: 'Makes a variable called steps and stores 1 in it.' },
+      { code: 'steps = steps + 1', text: 'Works out steps + 1, then stores the answer back in steps.' },
+    ],
+    maps: [['#############', '#SC##########', '##..C########', '####...C#####', '#######....C#', '###########E#', '#############']],
+    goals: { cells: true },
+    mode: 'mission',
+    par: 5,
+    python: 'steps = 1\nbot.move_right(steps)\nbot.move_down()\n',
+    blocks: [[{ type: 'var_set', fields: { N: 1 } }, { type: 'kilo_move_var', fields: { DIR: 'right', VAR: 'steps' } }, mv('down')]],
+    tools: ['move', 'repeat', 'variables'],
+    hints: [
+      'Each stair is the same three jobs: go right by steps squares, go down 1, then make steps one bigger.',
+      'Put steps = 1 above the loop, so it only happens once. Inside a loop that repeats 4 times: bot.move_right(steps), then bot.move_down(), then steps = steps + 1.',
+    ],
+    solution: 'steps = 1\nfor i in range(4):\n    bot.move_right(steps)\n    bot.move_down()\n    steps = steps + 1\n',
+    learn: { word: 'Variable', text: 'A named box that holds a value. The value can change while the program runs.' },
+    needs: ['variable'],
+  },
+  {
+    id: 'foundry-4',
+    district: 'foundry',
+    title: 'Sawtooth Ridge',
+    brief: [
+      'The ridge goes up three, then down three, again and again.',
+      'Climbing up is a loop. Coming down is a loop. And the whole tooth repeats as well.',
+      'Good news: you can put a loop inside another loop.',
+    ],
+    kilo: 'Up, up, up, down, down, down… Loops inside loops? My circuits are spinning.',
+    goal: 'Cross all three teeth and collect the cells on top.',
+    newCommands: [
+      { code: 'for t in range(3):', text: 'The outer loop: once for each tooth.' },
+      { code: '    for i in range(3):', text: 'An inner loop, pushed in further. It runs all the way through every time the outer loop goes round.' },
+    ],
+    maps: [['#####################', '###.C####.C####.C####', '##....##....##....###', '#..##....##....##..##', '#S####..####..####.E#', '#####################']],
+    goals: { cells: true },
+    mode: 'mission',
+    par: 7,
+    python: 'for i in range(3):\n    bot.move_up()\n    bot.move_right()\n',
+    blocks: [[{ type: 'kilo_repeat', fields: { N: 3 }, body: { DO: [mv('up'), mv('right')] } }]],
+    tools: ['move', 'repeat'],
+    hints: [
+      'Climbing one step is move up, then move right. Do that 3 times. Coming down is move down, then move right, 3 times.',
+      'The climb and the drop together make one tooth. Put both small loops inside for t in range(3):, pushed in 4 more spaces, to cross all three teeth.',
+    ],
+    solution:
+      'for t in range(3):\n    for i in range(3):\n        bot.move_up()\n        bot.move_right()\n    for i in range(3):\n        bot.move_down()\n        bot.move_right()\n',
+    learn: { word: 'Nested loop', text: 'A loop inside another loop. The inner loop runs all the way through each time the outer loop repeats once.' },
+  },
+  {
+    id: 'foundry-5',
+    district: 'foundry',
+    title: 'Wall Runner',
+    brief: [
+      'Three test maps again, all different, and you can only see the first one.',
+      'Here is a rule that solves them all: run right until you hit a wall, then run down until you hit a wall. Repeat.',
+      'Put each run in its own function. Then your main program is short enough to read in one go.',
+    ],
+    kilo: 'run_right() and run_down(). Two commands, and I can go anywhere!',
+    goal: 'Get through all three test maps using run_right() and run_down().',
+    newCommands: [
+      { code: 'while bot.look("right") != "wall":', text: 'Keep going while the square to the right is not a wall. != means “is not”.' },
+    ],
+    maps: [
+      ['##########', '#S...#####', '####.#####', '####.....#', '########.#', '########E#', '##########'],
+      ['############', '#S.#########', '##.#########', '##.#########', '##........E#', '############'],
+      ['#########', '#S#######', '#.#######', '#...#####', '###.#####', '###....E#', '#########'],
+    ],
+    goals: {},
+    mode: 'mission',
+    par: 9,
+    python:
+      'def run_right():\n    while bot.look("right") != "wall":\n        bot.move_right()\n\n# Build run_down() here.\n\nwhile not bot.at_exit():\n    run_right()\n',
+    blocks: [
+      [
+        {
+          type: 'fn_def',
+          fields: { NAME: 'run_right', PARAM: '' },
+          body: { DO: [{ type: 'kilo_while', value: { COND: { type: 'kilo_look_is', fields: { DIR: 'right', OP: '!=', THING: 'wall' } } }, body: { DO: [mv('right')] } }] },
+        },
+      ],
+      [{ type: 'kilo_while_exit', body: { DO: [{ type: 'fn_call', fields: { NAME: 'run_right' } }] } }],
+    ],
+    tools: ['move', 'while', 'sense', 'functions'],
+    hints: [
+      'run_down() is a copy of run_right(). Change "right" to "down" in all three places.',
+      'In the main loop, under while not bot.at_exit():, use run_right() and then run_down().',
+    ],
+    solution:
+      'def run_right():\n    while bot.look("right") != "wall":\n        bot.move_right()\n\ndef run_down():\n    while bot.look("down") != "wall":\n        bot.move_down()\n\nwhile not bot.at_exit():\n    run_right()\n    run_down()\n',
+    learn: {
+      word: 'Abstraction',
+      text: 'Hiding the details inside a name. Once run_right() works, you can use it without thinking about how it works inside.',
+    },
+    needs: ['def'],
+  },
+  {
+    id: 'foundry-6',
+    district: 'foundry',
+    title: 'The Foundry Core',
+    brief: [
+      'This is it: the Glitch’s core. Three test maps, cells hidden above and below the corridor, glitches in the way.',
+      'Break the job into small functions. One checks above Kilo, one checks below. Then the main loop uses them.',
+      'Get this right and every light in Nova Grid comes back on.',
+    ],
+    kilo: 'Small jobs, good names, one loop. Let’s finish this, Patcher.',
+    goal: 'Collect every cell on all three test maps.',
+    newCommands: [],
+    maps: [
+      ['############', '###C####C###', '#S...G....E#', '#####C######', '############'],
+      ['############', '##C#####C###', '#S.G..G...E#', '####C####C##', '############'],
+      ['############', '#########C##', '#SG.G.G.G.E#', '##C###C#####', '############'],
+    ],
+    goals: { cells: true },
+    mode: 'mission',
+    par: 14,
+    python: 'while not bot.at_exit():\n    bot.move_right()\n',
+    blocks: [[{ type: 'kilo_while_exit', body: { DO: [mv('right')] } }]],
+    tools: ['move', 'zap', 'while', 'if', 'sense', 'functions'],
+    hints: [
+      'Write check_up(): if bot.look("up") == "cell", move up, then back down. check_down() is the same, but looking and moving down first.',
+      'Each time round the main loop, do four things in order: check_up(), check_down(), zap right if there is a glitch, then move right one square.',
+    ],
+    solution:
+      'def check_up():\n    if bot.look("up") == "cell":\n        bot.move_up()\n        bot.move_down()\n\ndef check_down():\n    if bot.look("down") == "cell":\n        bot.move_down()\n        bot.move_up()\n\nwhile not bot.at_exit():\n    check_up()\n    check_down()\n    if bot.look("right") == "glitch":\n        bot.zap("right")\n    bot.move_right()\n',
+    learn: {
+      word: 'Decomposition',
+      text: 'Breaking a big problem into small parts you can solve one at a time. Every large program, and every AI system, is built this way.',
+    },
+    needs: ['def'],
+  },
 ];
+
+const NEED_TEXT: Record<Need, string> = {
+  def: 'Kilo made it, but this level is about building your own command. Put the moves inside a def, then use it by writing its name with brackets.',
+  param: 'Kilo made it! Now give your function an input in its brackets, like def clear(n):, so one command can handle every gap.',
+  variable: 'Kilo made it! Now use a variable that grows each time round, like steps = steps + 1.',
+};
+
+/** Why a winning program still misses the point of the level, or null if it doesn't. */
+export function unmetNeed(level: Level, code: string): string | null {
+  const src = code.replace(/#.*$/gm, '');
+  for (const need of level.needs ?? []) {
+    if (need === 'def' || need === 'param') {
+      const defs = [...src.matchAll(/^\s*def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*:/gm)];
+      const used = defs.filter(([, name]) => new RegExp(`^(?!\\s*def\\s).*\\b${name}\\s*\\(`, 'm').test(src));
+      if (!used.length) return NEED_TEXT.def;
+      if (need === 'param' && !used.some(([, , params]) => params.trim())) return NEED_TEXT.param;
+    }
+    if (need === 'variable' && !/^\s*([A-Za-z_]\w*)\s*(\+=|-=|=\s*\1\s*[-+*])/m.test(src)) return NEED_TEXT.variable;
+  }
+  return null;
+}
 
 export function levelById(id: string): Level | undefined {
   return LEVELS.find((l) => l.id === id);

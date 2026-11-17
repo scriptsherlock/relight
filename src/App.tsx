@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DISTRICTS, LEVELS, districtOf, levelById, levelsIn, type DistrictId, type Level } from './content/levels';
-import { WORKSHOP_COLOR, blankProject, projectToLevel, unpackProject } from './content/share';
+import { WORKSHOP_COLOR, blankProject, fixProject, projectToLevel, unpackProject } from './content/share';
 import { fresh, load, store, type SaveData, type Track, type WorkshopProject } from './save';
 import { Comms, type CommsLine } from './ui/Comms';
 import { Hub } from './ui/Hub';
@@ -25,7 +25,7 @@ const INTRO: CommsLine[] = [
   { who: 'vance', text: 'Two nights ago the Glitch got into the city’s code. One by one, every district went dark.' },
   { who: 'vance', text: 'We can’t fix it by hand. We need someone who can write code, and a robot to carry it out.' },
   { who: 'kilo', text: 'That’s me! Kilo, courier unit K-1L0. I’m small, I’m fast, and I do exactly what my code says. Exactly.' },
-  { who: 'vance', text: 'Restore the four districts. Then go to The Workshop and build something of your own. This city is yours to remake.' },
+  { who: 'vance', text: 'Restore the five districts. Then go to The Workshop and build something of your own. This city is yours to remake.' },
 ];
 
 function sharedFromHash(): WorkshopProject | null {
@@ -86,7 +86,7 @@ export function App() {
     setScreen({ kind: 'level', id: l.id, nonce: Date.now() });
   };
 
-  const project = save.workshop ?? blankProject('mission');
+  const project = save.workshop ? fixProject(save.workshop) : blankProject('mission');
 
   // ----------------------------------------------------------- screens
 
@@ -203,7 +203,7 @@ export function App() {
         backLabel="← Workshop"
         onSaveCode={(py, bl, shown) =>
           setSave((d) => {
-            const w = d.workshop ?? project;
+            const w = d.workshop ? fixProject(d.workshop) : project;
             return { ...d, workshop: { ...w, code: py ?? shown, blocks: bl ?? (py !== null ? null : w.blocks) } };
           })
         }

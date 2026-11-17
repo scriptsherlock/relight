@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadPyodide } from 'pyodide';
 import { arcadeEvent, arcadeLoad, attach, runMission } from '../../src/python/host';
-import { LEVELS, codeLines } from '../../src/content/levels';
+import { LEVELS, codeLines, unmetNeed } from '../../src/content/levels';
 import { parseMap } from '../../src/engine/sim';
+import { ARCADE_TEMPLATE, blankProject, fixProject, switchMode } from '../../src/content/share';
 
 const prelude = readFileSync(fileURLToPath(new URL('../../src/python/prelude.py', import.meta.url)), 'utf8');
 
@@ -58,6 +59,70 @@ describe('arcade levels', () => {
     expect(arcadeLoad(level.solution, level.maps[0]).error).toBeNull();
     const r = arcadeEvent('tick');
     expect(r?.glitchMoves).toBeGreaterThan(0);
+  });
+});
+
+describe('foundry: the idea is required, not just the win', () => {
+  const lv = (id: string) => LEVELS.find((l) => l.id === id)!;
+
+  it('every reference solution uses the idea its level teaches', () => {
+    for (const l of LEVELS) expect(unmetNeed(l, l.solution), l.id).toBeNull();
+  });
+
+  it('foundry-1: winning without a function is not enough', () => {
+    const l = lv('foundry-1');
+    const plain =
+      'bot.move_right()\nbot.zap("up")\nbot.move_up(2)\nbot.move_down(2)\nbot.move_right(3)\nbot.zap("up")\nbot.move_up(2)\nbot.move_down(2)\nbot.move_right(4)\nbot.zap("up")\nbot.move_up(2)\nbot.move_down(2)\nbot.move_right(3)\nbot.zap("up")\nbot.move_up(2)\nbot.move_down(2)\nbot.move_right()\n';
+    expect(runMission(plain, l.maps, l.goals).runs[0].won).toBe(true);
+    expect(unmetNeed(l, plain)).toContain('def');
+    // A def that is never called doesn't count either.
+    expect(unmetNeed(l, 'def grab():\n    pass\n' + plain)).toContain('def');
+  });
+
+  it('foundry-2: a function without an input is not enough', () => {
+    expect(unmetNeed(lv('foundry-2'), 'def go():\n    bot.move_right()\ngo()\n')).toContain('input');
+  });
+
+  it('foundry-3: needs a variable that changes', () => {
+    const l = lv('foundry-3');
+    expect(unmetNeed(l, 'bot.move_right()\nbot.move_down()\n')).toContain('variable');
+    expect(unmetNeed(l, 'steps = 1\nfor i in range(4):\n    bot.move_right(steps)\n    steps += 1\n')).toBeNull();
+  });
+
+  it('warns when a function is built but never used', () => {
+    const r = runMission('def hop():\n    bot.move_right()\n', [['#####', '#S.E#', '#####']], {});
+    expect(r.warnings[0].title).toBe('hop() is never used');
+  });
+
+  it('bot.move takes any direction', () => {
+    const r = runMission('bot.move("right", 2)', [['#####', '#S.E#', '#####']], {});
+    expect(r.runs[0].won).toBe(true);
+  });
+});
+
+describe('workshop modes keep their own code', () => {
+  const mission = { ...blankProject('mission'), code: 'bot.move_right(2)\n' };
+
+  it('switching to arcade and back gives the mission code back', () => {
+    const arcade = switchMode(mission, 'arcade');
+    expect(arcade.code).toContain('def on_key');
+    const edited = { ...arcade, code: arcade.code + '\n# my rule\n' };
+    const back = switchMode(edited, 'mission');
+    expect(back.code).toBe('bot.move_right(2)\n');
+    expect(switchMode(back, 'arcade').code).toContain('# my rule');
+  });
+
+  it('repairs a mission that was left holding arcade rules', () => {
+    const stuck = { ...mission, code: ARCADE_TEMPLATE };
+    const fixed = fixProject(stuck);
+    expect(fixed.code).toBe('');
+    expect(switchMode(fixed, 'arcade').code).toBe(ARCADE_TEMPLATE);
+    expect(fixProject(mission)).toBe(mission);
+  });
+
+  it('warns when game code is run as a mission', () => {
+    const r = runMission(ARCADE_TEMPLATE, [['#####', '#S.E#', '#####']], {});
+    expect(r.warnings.map((w) => w.title)).toContain('This is game code');
   });
 });
 

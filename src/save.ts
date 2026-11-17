@@ -28,6 +28,8 @@ export interface WorkshopProject {
   cells: boolean;
   code: string;
   blocks: object | null;
+  /** The other mode's code, kept so switching Mission/Arcade loses nothing. */
+  other?: { code: string; blocks: object | null };
 }
 
 const KEY = 'relight.save.v1';

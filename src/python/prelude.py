@@ -61,6 +61,9 @@ class Bot:
     def move_right(self, steps=1):
         _act("move", "right", _steps(steps, "move_right"))
 
+    def move(self, direction, steps=1):
+        _act("move", _dir(direction, "move"), _steps(steps, "move"))
+
     def zap(self, direction=None):
         _act("zap", None if direction is None else _dir(direction, "zap"))
 
@@ -269,6 +272,9 @@ def _fmt(e, ns):
     return {"title": title, "detail": detail, "line": int(line or 0)}
 
 
+EVENT_HANDLERS = ("on_start", "on_key", "on_tick", "on_collect", "on_exit")
+
+
 def _warnings(code):
     """Spot `bot.move_right` without brackets, the most common beginner bug."""
     out = []
@@ -285,6 +291,16 @@ def _warnings(code):
                     "detail": f"{v.value.id}.{v.attr} does nothing without brackets. Write {v.value.id}.{v.attr}()",
                     "line": node.lineno,
                 })
+        # A function that is built but never used: Kilo does nothing.
+        if isinstance(node, ast.Module):
+            called = {c.func.id for c in ast.walk(node) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+            for fn in node.body:
+                if isinstance(fn, ast.FunctionDef) and fn.name not in called and fn.name not in EVENT_HANDLERS:
+                    out.append({
+                        "title": f"{fn.name}() is never used",
+                        "detail": f"def only teaches Kilo the command. To run it, write {fn.name}() on its own line, below the function.",
+                        "line": fn.lineno,
+                    })
         # The exit has no cell, so at_exit() inside on_collect is never true.
         if isinstance(node, ast.FunctionDef) and node.name == "on_collect":
             for sub in ast.walk(node):

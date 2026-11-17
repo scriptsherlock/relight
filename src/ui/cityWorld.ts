@@ -1,7 +1,7 @@
 // The open-world hub: a top-down neon city that Kilo drives around.
 // Districts light up as they are restored. Pure canvas, no React.
 
-export type GateId = 'docks' | 'loops' | 'spires' | 'arcade' | 'workshop';
+export type GateId = 'docks' | 'loops' | 'spires' | 'arcade' | 'foundry' | 'workshop';
 
 export interface GateInfo {
   id: GateId;
@@ -43,6 +43,7 @@ export const GATES: Omit<GateInfo, 'lit' | 'locked' | 'beacon'>[] = [
   { id: 'loops', name: 'Loop Line', color: '#FF5FD2', x: 550, y: 360 },
   { id: 'spires', name: 'Signal Spires', color: '#FFBC3D', x: 1850, y: 360 },
   { id: 'arcade', name: 'The Arcade', color: '#9BFF5A', x: 1850, y: 1150 },
+  { id: 'foundry', name: 'The Foundry', color: '#5AA9FF', x: 1200, y: 170 },
   { id: 'workshop', name: 'The Workshop', color: '#C9B6FF', x: 1200, y: 755 },
 ];
 
@@ -50,6 +51,7 @@ function zoneOf(x: number, y: number): GateId {
   const cx = 1200;
   const cy = 755;
   if (Math.hypot(x - cx, y - cy) < 330) return 'workshop';
+  if (Math.hypot(x - 1200, y - 170) < 300) return 'foundry';
   if (x < cx) return y < cy ? 'loops' : 'docks';
   return y < cy ? 'spires' : 'arcade';
 }

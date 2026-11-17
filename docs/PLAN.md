@@ -25,10 +25,21 @@ Relight fills both gaps:
 
 1. **Playtest with a class**: watch where pupils get stuck in Docks 5, Spires 3 and Arcade 1.
 2. **Accounts and class gallery**: plug into the site's class codes so shared levels go to a teacher-approved class gallery instead of raw links.
-3. **More districts**: Search (pathfinding), Functions (`def`), Learning (train from examples), Reward (train with score).
+3. **More districts**: Search (pathfinding), Learning (train from examples), Reward (train with score). Functions is done: The Foundry (6 levels, added 2026-11-17) covers `def`, parameters, variables, nested loops and general functions on unseen maps. A level can list `needs` so a win that skips the idea gets a nudge instead of stars.
 4. **Workshop v2**: more tiles (doors, keys, moving glitches), sprite choice, and blocks-only mode for arcade games.
 5. **Art pass**: commissioned character art for Vance and Kilo (currently SVG and canvas drawings).
 6. **Teacher view**: progress per pupil, answers, and the `#unlock` switch as a proper setting.
+
+## Next build: make the hub feel like a city
+
+Requested 2026-11-17: the open world should look and feel like a living city, not a map.
+
+- **Move the hub to three.js**: a low-poly neon city at a tilted 3D angle, Kilo driving the streets, with the same districts, gates and progress rules. Keep the current 2D canvas as the fallback for slow school laptops and older iPads.
+- **People**: simple pedestrians and other bots walking the pavements, more of them in districts that are lit, and a few who say a line when Kilo passes (hints, jokes, district lore).
+- **Adverts and signs**: neon billboards and shop signs, some playful ("Loop Line: Repeat Yourself!"). They switch on when their district is restored.
+- **City life**: traffic lights, cars on the avenues, drones over the Spires, and steam in the Foundry.
+- **More UI**: a proper minimap with labels, a quest tracker showing the next level, and a district preview card on approach.
+- **Budget**: keep the first load small (three.js is about 150 KB gzipped, on top of Pyodide). Test frame rate on a 1366×768 school laptop and an iPad before shipping.
 
 ## Known limits
 

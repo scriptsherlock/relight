@@ -98,7 +98,7 @@ export function Title({ hasSave, onStart }: { hasSave: boolean; onStart: () => v
         <button className="btn primary big" onClick={onStart} autoFocus>
           {hasSave ? 'Continue' : 'Start'}
         </button>
-        <p className="muted small">Blocks or real Python · Make your own levels and games</p>
+        <p className="title-foot">Blocks or real Python. Make your own levels and games.</p>
       </div>
     </div>
   );
