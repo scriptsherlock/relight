@@ -34,6 +34,14 @@ Relight fills both gaps:
 
 Requested 2026-11-17: the open world should look and feel like a living city, not a map.
 
+**Status (2026-11-18, `dev` branch):** first version built in `src/ui/city3d.ts`.
+- Done: three.js city (loaded only when the hub opens), lit windows per district, rooftop billboards, pedestrians, a talking local at every gate, cars that stop for Kilo, drones over the Spires, Foundry steam, and portal gates with power rings.
+- Done: quest tracker ("Next job" with Go there and Play), approach card with progress, labelled minimap.
+- Done: the flat map stays as a menu option and as the automatic fallback when WebGL fails.
+- Still to do: traffic lights, and a real-device frame-rate check on a school laptop and an iPad. The renderer lowers its resolution by itself when frames are slow.
+
+Original idea list:
+
 - **Move the hub to three.js**: a low-poly neon city at a tilted 3D angle, Kilo driving the streets, with the same districts, gates and progress rules. Keep the current 2D canvas as the fallback for slow school laptops and older iPads.
 - **People**: simple pedestrians and other bots walking the pavements, more of them in districts that are lit, and a few who say a line when Kilo passes (hints, jokes, district lore).
 - **Adverts and signs**: neon billboards and shop signs, some playful ("Loop Line: Repeat Yourself!"). They switch on when their district is restored.

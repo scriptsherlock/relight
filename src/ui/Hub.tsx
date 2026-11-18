@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DISTRICTS, levelsIn, type DistrictId, type Level } from '../content/levels';
 import { rankFor, type SaveData, type Track } from '../save';
-import { CityWorld, GATES, type GateId } from './cityWorld';
+import { CityWorld, GATES, type GateId, type GateInfo } from './cityWorld';
 import { Portrait } from './Comms';
 import { tapOr } from './device';
 
@@ -32,7 +32,14 @@ const KEY_DIR: Record<string, string> = {
 
 export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onTrack, onReset, lastGate }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const miniRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<CityWorld | null>(null);
+  // 3D city by default; the flat map is the fallback and a choice in the menu.
+  const [view, setView] = useState<'3d' | '2d'>(() => (localStorage.getItem('relight.cityView') === '2d' ? '2d' : '3d'));
+  const chooseView = (v: '3d' | '2d') => {
+    localStorage.setItem('relight.cityView', v);
+    setView(v);
+  };
   const [near, setNear] = useState<GateId | null>(null);
   const [panel, setPanel] = useState<GateId | null>(null);
   const [menu, setMenu] = useState(false);
@@ -52,6 +59,21 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
   };
   const nextDistrict = DISTRICTS.find((d) => isDistrictOpen(d.id) && districtLit(d.id) < 1);
   const litCount = DISTRICTS.filter((d) => districtLit(d.id) === 1).length;
+  const nextLevel = (() => {
+    for (const d of DISTRICTS) {
+      if (!isDistrictOpen(d.id)) continue;
+      const l = levelsIn(d.id).find((x) => !save.progress[x.id]?.done && isLevelOpen(x));
+      if (l) return l;
+    }
+    return null;
+  })();
+  const gatesNow = useRef<() => GateInfo[]>(() => []);
+  gatesNow.current = () =>
+    GATES.map((g) => {
+      if (g.id === 'workshop') return { ...g, lit: 1, locked: false, beacon: false };
+      const d = g.id as DistrictId;
+      return { ...g, lit: districtLit(d), locked: !isDistrictOpen(d), beacon: nextDistrict?.id === d };
+    });
 
   const openGate = (id: GateId) => {
     if (id === 'workshop') onWorkshop();
@@ -60,8 +82,32 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const w = new CityWorld(canvas);
+    let cancelled = false;
+    let stop = () => undefined as void;
+    if (view === '3d') {
+      import('./city3d')
+        .then(({ CityWorld3D, webglOK }) => {
+          if (cancelled) return;
+          if (!webglOK()) return setView('2d');
+          try {
+            stop = start(new CityWorld3D(canvas, miniRef.current));
+          } catch {
+            setView('2d');
+          }
+        })
+        .catch(() => !cancelled && setView('2d'));
+    } else stop = start(new CityWorld(canvas));
+    return () => {
+      cancelled = true;
+      stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  const start = (w: CityWorld) => {
+    const canvas = canvasRef.current!;
     worldRef.current = w;
+    w.gates = gatesNow.current();
     if (lastGate) {
       const g = GATES.find((q) => q.id === lastGate);
       if (g) {
@@ -113,19 +159,16 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
+      w.dispose();
+      if (worldRef.current === w) worldRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   // Keep gate state in sync with progress.
   useEffect(() => {
     const w = worldRef.current;
     if (!w) return;
-    w.gates = GATES.map((g) => {
-      if (g.id === 'workshop') return { ...g, lit: 1, locked: false, beacon: false };
-      const d = g.id as DistrictId;
-      return { ...g, lit: districtLit(d), locked: !isDistrictOpen(d), beacon: nextDistrict?.id === d };
-    });
+    w.gates = gatesNow.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [save, isDistrictOpen]);
 
@@ -143,8 +186,9 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
   return (
     <div className="hub">
       <canvas
+        key={view}
         ref={canvasRef}
-        className="hub-canvas"
+        className={`hub-canvas ${view === '3d' ? 'is-3d' : ''}`}
         aria-label={tapOr("Nova Grid city map. Tap to drive Kilo, or use the Districts menu.", "Nova Grid city map. Use the arrow keys to drive Kilo, or the Districts menu.")}
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -201,16 +245,63 @@ export function Hub({ save, isDistrictOpen, isLevelOpen, onPlay, onWorkshop, onT
             The Workshop
           </button>
           <hr />
+          <button role="menuitem" onClick={() => (setMenu(false), chooseView(view === '3d' ? '2d' : '3d'))}>
+            {view === '3d' ? 'Switch to the flat map' : 'Switch to the 3D city'}
+            <span className="muted small">{view === '3d' ? 'faster' : 'new'}</span>
+          </button>
           <button role="menuitem" className="danger-text" onClick={() => (setMenu(false), onReset())}>
             Reset my progress…
           </button>
         </div>
       )}
-      {nearGate && !panel && (
-        <button className="gate-prompt" style={{ ['--accent' as string]: nearGate.color }} onClick={() => openGate(nearGate.id)}>
-          <kbd className="desk-only">Enter</kbd> {nearGate.id === 'workshop' ? 'Open' : 'Enter'} {nearGate.name}
-        </button>
-      )}
+      {view === '3d' && <canvas ref={miniRef} className="hub-minimap" aria-hidden="true" />}
+      <div className="quest" style={{ ['--accent' as string]: nextLevel ? DISTRICTS.find((d) => d.id === nextLevel.district)!.color : '#C9B6FF' }}>
+        <span className="quest-label">Next job</span>
+        {nextLevel ? (
+          <>
+            <span className="quest-title">{nextLevel.title}</span>
+            <span className="quest-where">{DISTRICTS.find((d) => d.id === nextLevel.district)!.name}</span>
+            <div className="quest-actions">
+              <button className="btn ghost small" onClick={() => worldRef.current?.travelTo(nextLevel.district)}>
+                Go there
+              </button>
+              <button className="btn small quest-play" onClick={() => onPlay(nextLevel)}>
+                Play
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="quest-title">Build your own level</span>
+            <span className="quest-where">Every district is lit</span>
+            <div className="quest-actions">
+              <button className="btn ghost small" onClick={() => worldRef.current?.travelTo('workshop')}>
+                Go there
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      {nearGate && !panel && (() => {
+        const d = DISTRICTS.find((x) => x.id === nearGate.id);
+        const ls = d ? levelsIn(d.id) : [];
+        const got = ls.filter((l) => save.progress[l.id]?.done).length;
+        const locked = d ? !isDistrictOpen(d.id) : false;
+        return (
+          <button className="gate-prompt" style={{ ['--accent' as string]: nearGate.color }} onClick={() => openGate(nearGate.id)}>
+            <span className="gp-name">{nearGate.name}</span>
+            <span className="gp-meta">{d ? (locked ? 'Locked' : `${d.concept}: ${got} of ${ls.length} levels`) : 'Build and share your own levels'}</span>
+            {d && !locked && (
+              <span className="gp-bar" aria-hidden="true">
+                <i style={{ width: `${(got / Math.max(1, ls.length)) * 100}%` }} />
+              </span>
+            )}
+            <span className="gp-go">
+              <kbd className="desk-only">Enter</kbd> {nearGate.id === 'workshop' ? 'Open' : 'Enter'} {nearGate.name}
+            </span>
+          </button>
+        );
+      })()}
       {tipOpen ? (
         <div className="hub-tip">
           <Portrait who="vance" size={44} />

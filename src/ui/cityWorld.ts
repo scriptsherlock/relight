@@ -15,7 +15,7 @@ export interface GateInfo {
   beacon: boolean;
 }
 
-interface Building {
+export interface Building {
   x: number;
   y: number;
   w: number;
@@ -27,7 +27,7 @@ interface Building {
 
 export const WORLD = { w: 2400, h: 1500 };
 
-const ROADS = [
+export const ROADS = [
   // main avenues
   { x: 0, y: 700, w: 2400, h: 110 },
   { x: 1145, y: 0, w: 110, h: 1500 },
@@ -47,7 +47,7 @@ export const GATES: Omit<GateInfo, 'lit' | 'locked' | 'beacon'>[] = [
   { id: 'workshop', name: 'The Workshop', color: '#C9B6FF', x: 1200, y: 755 },
 ];
 
-function zoneOf(x: number, y: number): GateId {
+export function zoneOf(x: number, y: number): GateId {
   const cx = 1200;
   const cy = 755;
   if (Math.hypot(x - cx, y - cy) < 330) return 'workshop';
@@ -56,7 +56,7 @@ function zoneOf(x: number, y: number): GateId {
   return y < cy ? 'spires' : 'arcade';
 }
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let s = seed >>> 0;
   return () => {
     s = (s * 1664525 + 1013904223) >>> 0;
@@ -88,13 +88,13 @@ function makeBuildings(): Building[] {
 }
 
 export class CityWorld {
-  private ctx: CanvasRenderingContext2D;
-  private buildings = makeBuildings();
-  private W = 0;
-  private H = 0;
+  protected ctx: CanvasRenderingContext2D;
+  protected buildings = makeBuildings();
+  protected W = 0;
+  protected H = 0;
   bot = { x: 1200, y: 960, vx: 0, vy: 0, dir: 0 };
-  private keys = new Set<string>();
-  private target: { x: number; y: number; gate: GateId | null } | null = null;
+  protected keys = new Set<string>();
+  protected target: { x: number; y: number; gate: GateId | null } | null = null;
   gates: GateInfo[] = [];
   cam = { x: 0, y: 0 };
   private sparks: { t: number; road: number; speed: number; off: number }[] = [];
@@ -102,11 +102,17 @@ export class CityWorld {
   onNear: (g: GateId | null) => void = () => undefined;
   onArrive: (g: GateId) => void = () => undefined;
 
-  constructor(private canvas: HTMLCanvasElement) {
-    this.ctx = canvas.getContext('2d')!;
+  /** `flat: false` leaves the canvas free for another renderer (WebGL). */
+  constructor(
+    protected canvas: HTMLCanvasElement,
+    flat = true,
+  ) {
+    this.ctx = (flat ? canvas.getContext('2d') : null) as CanvasRenderingContext2D;
     const r = rng(7);
     for (let i = 0; i < 46; i++) this.sparks.push({ t: r(), road: Math.floor(r() * ROADS.length), speed: 0.02 + r() * 0.05, off: r() });
   }
+
+  dispose() {}
 
   resize() {
     const rect = this.canvas.getBoundingClientRect();
@@ -131,9 +137,12 @@ export class CityWorld {
 
   /** Click on the canvas: walk there, or to a gate. */
   click(sx: number, sy: number) {
-    const wx = sx + this.cam.x;
-    const wy = sy + this.cam.y;
-    const g = this.gates.find((q) => Math.hypot(q.x - wx, q.y - wy) < 80);
+    this.clickWorld(sx + this.cam.x, sy + this.cam.y);
+  }
+
+  /** Walk to a point in world units, or to a gate if it is close to one. */
+  protected clickWorld(wx: number, wy: number, gateRadius = 80) {
+    const g = this.gates.find((q) => Math.hypot(q.x - wx, q.y - wy) < gateRadius);
     this.target = g ? { x: g.x, y: g.y + 50, gate: g.id } : { x: wx, y: wy, gate: null };
   }
 
@@ -202,11 +211,11 @@ export class CityWorld {
     for (const s of this.sparks) s.t = (s.t + s.speed * dt) % 1;
   }
 
-  private gate(id: GateId) {
+  protected gate(id: GateId) {
     return this.gates.find((g) => g.id === id);
   }
 
-  private alpha(hex: string, a: number) {
+  protected alpha(hex: string, a: number) {
     const n = parseInt(hex.slice(1), 16);
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
   }
@@ -303,7 +312,7 @@ export class CityWorld {
 
     this.drawBot(now);
     ctx.restore();
-    this.drawMinimap();
+    this.drawMinimap(ctx, W - 198, 74, 180, { x: this.cam.x, y: this.cam.y, w: this.W, h: this.H });
   }
 
   private drawGate(g: GateInfo, now: number) {
@@ -449,12 +458,9 @@ export class CityWorld {
     ctx.restore();
   }
 
-  private drawMinimap() {
-    const { ctx, W } = this;
-    const mw = 180;
+  /** Minimap with labelled districts. `view` is the visible area, if any. */
+  drawMinimap(ctx: CanvasRenderingContext2D, x: number, y: number, mw: number, view?: { x: number; y: number; w: number; h: number }) {
     const mh = (mw * WORLD.h) / WORLD.w;
-    const x = W - mw - 18;
-    const y = 74;
     const s = mw / WORLD.w;
     ctx.save();
     ctx.fillStyle = 'rgba(14, 18, 26, 0.85)';
@@ -472,12 +478,21 @@ export class CityWorld {
       ctx.arc(x + g.x * s, y + g.y * s, 5, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.font = '700 8px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    for (const g of this.gates) {
+      ctx.fillStyle = g.locked ? '#6b7489' : '#dfe6f5';
+      const label = g.name.replace(/^The /, '').toUpperCase();
+      ctx.fillText(label, x + g.x * s, y + g.y * s + (g.y * s > mh - 14 ? -8 : 13));
+    }
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(x + this.bot.x * s, y + this.bot.y * s, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.strokeRect(x + this.cam.x * s, y + this.cam.y * s, this.W * s, this.H * s);
+    if (view) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeRect(x + view.x * s, y + view.y * s, view.w * s, view.h * s);
+    }
     ctx.restore();
   }
 }

@@ -24,7 +24,7 @@ Teacher shortcut: add `#unlock` to the URL to open every district.
 | Area | What pupils do | Coding idea |
 |---|---|---|
 | Title, story intro, track choice | Meet Director Vance and Kilo. Pick **Blocks** or **Python** (switch at any time) | |
-| City hub (open world) | Drive Kilo round Nova Grid; districts light up as they're restored | |
+| City hub (open world) | Drive Kilo round a 3D neon city (three.js): people, cars, billboards and locals who talk; districts light up as they're restored. A flat map is in the Districts menu for slower devices | |
 | The Docks (5 levels) | Move, collect cells, zap glitches | Sequences, commands, inputs |
 | Loop Line (3) | Stairs, alleys, snakes | `for` loops, patterns |
 | Signal Spires (3) | Code is run on **hidden test maps** | `if`/`else`, `while`, sensing. Also generalisation, an AI idea |
